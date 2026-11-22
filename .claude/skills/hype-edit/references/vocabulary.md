@@ -62,4 +62,4 @@ One language for every clip, whatever the game. **Beats** describe the footage (
 }
 ```
 
-Paths are relative to the plan file. Optional: `out_dir` (the pipeline uses `"project"`), `music.drop` (seconds in the track) to override drop detection, `mix_gain_db` (render prints it when loudness is off), `note` on any beat.
+Paths are relative to the plan file. `style`: `phonk-hype` or `talk`. `mode`: `full` (default) or `segment` (inside a montage or ranking: `text.hook` and `outro` are ignored and may be omitted, no music). `text.stamp` may be empty for no stamp. Optional: `out_dir` (the pipeline uses `"project"`), `music.drop` (seconds in the track) to override drop detection, `mix_gain_db` (render prints it when loudness is off), `note` on any beat.

@@ -18,6 +18,7 @@ import pathlib
 from . import config, fetch, select, signals, text, windows
 
 GUIDE = ("Read `.claude/skills/clip-pipeline/references/picking.md` before the first window. Brief: {brief}\n"
+         "Request: {request}\n"
          "Kinds: {kinds}.\n"
          "Markers: CMT = viewers timestamped this in comments (likes-weighted), REPLAYED = YouTube most-replayed, "
          "CHAT xN = chat N times faster than usual, "
@@ -89,7 +90,8 @@ def run(job, rescan: bool = False) -> None:
                 else windows.full(dur, float(r["chunk_min"])))
         kinds = "; ".join(f"{k} {v['length'][0]}-{v['length'][1]}s ({v.get('means', '')})" for k, v in r["kinds"].items())
         header = f"# {m.get('title')} ({m.get('channel') or m.get('uploader')}, {windows.hms(dur)})"
-        guide = GUIDE.format(brief=r["brief"] or "(none: pick what a viewer would share)", kinds=kinds)
+        guide = GUIDE.format(brief=r["brief"] or "(none)", kinds=kinds,
+                             request=r["request"] or "(none: pick broadly; the selection will recommend shorts)")
         windows.write(wins, lines, series, rawstats, by_bin, rd / "chunks", header, guide,
                       text.romanize if roman else (lambda s: s))
         wfile.write_text(json.dumps(wins, indent=1))
@@ -123,18 +125,27 @@ def run(job, rescan: bool = False) -> None:
         select.report(short, m.get("webpage_url") or url, rd / "report.md")
     short = json.loads(sfile.read_text())
 
-    # ---- gate 2: selection
+    # ---- gate 2: selection (the AI's proposal of shorts)
     sel = rd / "selection.json"
     if not sel.exists() or sel.stat().st_mtime < sfile.stat().st_mtime:
         _say(f"\nNEEDS SELECTION: {len(short)} shortlisted ({rd / 'report.md'}); check each verify sheet "
-             f"({rd / 'verify'}/<id>.jpg), then write {sel}")
+             f"({rd / 'verify'}/<id>.jpg), then propose shorts in {sel}")
+        return
+
+    # ---- gate 3: the person confirms the proposal
+    selection = json.loads(sel.read_text())
+    proposal = rd / "proposal.md"
+    select.proposal(short, selection, r, m.get("webpage_url") or url, proposal)
+    if not selection.get("confirmed"):
+        _say(f"\nNEEDS CONFIRMATION: show the person {proposal} (timestamps, preview links, verify sheets); "
+             f'when they confirm (or after their changes), set "confirmed": true in {sel.name} and run research again')
         return
 
     # ---- finalize
     marker = rd / "finalized.json"
     if marker.exists() and marker.stat().st_mtime >= sel.stat().st_mtime:
-        _say(f"\nresearch done: {json.loads(marker.read_text())['clips']} clips in {job.path.name}; next: python3 -m pipeline run {job.path.name and job.path}")
+        _say(f"\nresearch done: {json.loads(marker.read_text())['clips']} clips in {job.path.name}; next: python3 -m pipeline run {job.path}")
         return
-    count = select.finalize(job.path, job.cfg, r, short, json.loads(sel.read_text()), rd)
+    count = select.finalize(job.path, job.cfg, r, short, selection, rd)
     marker.write_text(json.dumps({"clips": count}))
     _say(f"\nresearch done: {count} clips written to {job.path} (previous version in {rd}); next: python3 -m pipeline run {job.path}")

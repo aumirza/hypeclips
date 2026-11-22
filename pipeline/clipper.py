@@ -183,7 +183,9 @@ def escape_drawtext(text: str) -> str:
     return (
         text.replace("\\", r"\\")
         .replace(":", r"\:")
-        .replace("'", r"\'")
+        # a straight quote can't be escaped inside ffmpeg's quoted filter values; the
+        # typographic apostrophe looks the same in the title font
+        .replace("'", "\u2019")
         .replace("%", r"\%")
     )
 
@@ -313,6 +315,36 @@ def run_ai_vocal_strip(raw_path: pathlib.Path, audio_cfg: dict[str, Any], work_d
     return None, "ffmpeg_vocal_cut"
 
 
+def raw_stamp(clip: dict[str, Any], max_height: int) -> str:
+    return f"{max_height}|{clip['start']}|{clip['end']}"
+
+
+def raw_matches(raw_path: pathlib.Path, clip: dict[str, Any], max_height: int) -> bool:
+    """Is this raw file the clip's current range at the current max height?"""
+    stamp = raw_path.with_name(raw_path.name + ".maxh")
+    if not (raw_path.exists() and stamp.exists()):
+        return False
+    want = raw_stamp(clip, max_height)
+    have = stamp.read_text().strip()
+    if have == want:
+        return True
+    if have == str(max_height):  # older sidecar (height only): trust it when the length matches the range
+        dur, _ = probe_media(raw_path)
+        span = parse_timestamp(str(clip["end"])) - parse_timestamp(str(clip["start"]))
+        if abs(dur - span) <= 0.6:
+            stamp.write_text(want)
+            return True
+    return False
+
+
+def clear_derived_audio(raw_path: pathlib.Path, work_dir: pathlib.Path) -> None:
+    """Drop audio made from an old raw file (its wav and separated stems), so nothing reuses it."""
+    stem = f"{raw_path.stem}_orig"
+    (work_dir / f"{stem}.wav").unlink(missing_ok=True)
+    for d in list(work_dir.glob(f"demucs_out/*/{stem}")) + list(work_dir.glob(f"sep_{raw_path.stem}")):
+        shutil.rmtree(d, ignore_errors=True)
+
+
 def download_segment(
     url: str,
     clip: dict[str, Any],
@@ -322,12 +354,13 @@ def download_segment(
     max_height: int = 1440,
 ) -> pathlib.Path:
     out_file = work_dir / f"raw_{clip['id']:02d}.mp4"
-    # sidecar records the max height a raw file was fetched at, so raising
-    # download.max_height re-fetches old lower-res downloads once
+    # the sidecar records what a raw file is (its time range and max height): a clip id
+    # that now points at another range, or a raised download.max_height, re-fetches it
     stamp = out_file.with_name(out_file.name + ".maxh")
-    dur, _ = probe_media(out_file)
-    if dur > 1.0 and stamp.exists() and stamp.read_text().strip() == str(max_height):
+    want = raw_stamp(clip, max_height)
+    if raw_matches(out_file, clip, max_height):
         return out_file
+    clear_derived_audio(out_file, work_dir)
 
     h = max_height
     node_bin = shutil.which("node")
@@ -359,7 +392,7 @@ def download_segment(
             run(cmd)
             dur, _ = probe_media(out_file)
             if dur > 1.0:
-                stamp.write_text(str(max_height))
+                stamp.write_text(want)
                 return out_file
             raise RuntimeError(f"Downloaded file invalid or too short ({dur:.2f}s)")
         except Exception as exc:

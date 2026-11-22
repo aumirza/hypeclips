@@ -66,12 +66,38 @@ Most windows have 0-2 real moments; many have none. `[]` is a normal answer.
 - `hashtags`: specific to the moment; the job's `research.hashtags` are added automatically.
 - `why`: the evidence (markers, comment text, what is said or seen), so the selection step can judge it.
 
-## Selection (gate 2)
+## The request
 
-After every window has a picks file, `research` builds `research/shortlist.json` and `report.md` (with preview links) and a 360p contact sheet per moment in `research/verify/<id>.jpg`. Look at every sheet: drop moments whose picture doesn't deliver what the pick promised, correct `start`/`end`/`payoff` to what you see, and write `research/selection.json` in the order the clips should be numbered:
+The window header shows the job's `research.request`, the person's own words.
+
+- **A request** ("gunfight shorts", "top 5 car stunts", "funniest moments"): pick only moments that serve it, and say in `why` how each one does. A ranking request needs at least as many strong moments as places; if the stream doesn't have them, say so at selection rather than padding.
+- **No request**: pick broadly. The selection then **recommends** shorts: what this stream is best for.
+
+## Selection (gate 2): propose shorts
+
+After every window has a picks file, `research` builds `research/shortlist.json`, `report.md` (with preview links) and a 360p contact sheet per moment (`research/verify/<id>.jpg`). Look at every sheet: drop moments whose picture doesn't deliver what the pick promised, and correct `start`/`end`/`payoff` to what you see. Then write `research/selection.json` as **shorts**:
 
 ```json
-{ "clips": [ { "id": "s03", "slug": "carried_the_squad", "label": "Carried the Squad", "payoff": "03:51:46.5" } ] }
+{
+  "confirmed": false,
+  "shorts": [
+    { "format": "ranking", "header": "TOP 3 WILDEST GTA 6 MOMENTS",
+      "title": "Top 3 wildest moments from his first GTA 6 stream", "caption": "#1 had him begging 😭 Which was yours?",
+      "hashtags": ["#GTA6"], "outro": ["WHICH ONE", "WAS YOUR #1?"],
+      "clips": [ { "id": "s05", "payoff": "00:25:17.5" }, "s07", "s01" ] },
+    { "format": "montage", "hook": ["3 TIMES GTA 6", "WENT CRAZY"], "outro": ["WHICH ONE", "WAS WILDER?"],
+      "clips": [ "s02", "s09" ] },
+    { "format": "single", "clips": [ "s03" ] }
+  ]
+}
 ```
 
-Any field you set overrides the shortlist's (`start`, `end`, `payoff`, `title`, `caption`, `hook`, `hashtags`). Keep `research.count` clips unless fewer deserve it; say so if fewer do.
+- **single**: one clip, the whole short (its own hook and outro come from its edit plan).
+- **montage**: 2-3 clips on one theme, cut together; give it a `hook` (frame-0 title) and an `outro` question.
+- **ranking**: 2-10 clips in **play order, last = #1**; give it a `header` (stays on screen) and an `outro`. Rankings work best at 3-5 places of 6-12 s each (segments are trimmed around their `payoff` to `research.segment_length`), so one ranking stays near a minute.
+- A clip belongs to one short. Any field you set on a clip entry overrides the shortlist's (`start`, `end`, `payoff`, `title`, `caption`, `hook`, `hashtags`, `slug`).
+- With no request, recommend what the moments support: the strongest moments as singles, and a ranking or montage when several share a theme. Fewer, better shorts beat padding.
+
+## Confirmation (gate 3): the person decides
+
+`research` then writes `research/proposal.md` (every short, its clips in order, timestamps, length, preview links and verify-sheet paths) and stops at NEEDS CONFIRMATION. Show the person the proposal in a few lines per short and wait for their answer. Apply what they change to `selection.json`; when they confirm, set `"confirmed": true` and run `research` again. Never set it without their confirmation.

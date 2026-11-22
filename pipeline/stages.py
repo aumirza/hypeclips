@@ -53,22 +53,22 @@ def newer(a: pathlib.Path, b: pathlib.Path) -> bool:
 # ------------------------------------------------------------------ short
 
 
-def short_done(job: Job, c: Clip) -> bool:
-    return job.short(c).exists() and job.raw_is_current(c)
+def plain_done(job: Job, c: Clip) -> bool:
+    return job.plain(c).exists() and job.raw_is_current(c)
 
 
-def shorts(job: Job, clips: list[Clip], force=False) -> list[int]:
-    """Run the clipper for clips whose short or raw download is missing or stale. Returns failed ids."""
-    todo = [c for c in clips if force or not short_done(job, c)]
+def plain_cuts(job: Job, clips: list[Clip], force=False) -> list[int]:
+    """Run the clipper for clips whose plain cut or raw download is missing or stale. Returns failed ids."""
+    todo = [c for c in clips if force or not plain_done(job, c)]
     if not todo:
         return []
     job.ws.mkdir(parents=True, exist_ok=True)
     resolved = dict(job.cfg)
-    resolved["output_dir"] = str(job.shorts)
+    resolved["output_dir"] = str(job.plain_dir)
     rp = job.ws / "job.resolved.json"
     rp.write_text(json.dumps(resolved, indent=2, default=str))
     # a short that exists over a stale (lower-res) raw is re-made: --force for those
-    stale = [c.id for c in todo if force or job.short(c).exists()]
+    stale = [c.id for c in todo if force or job.plain(c).exists()]
     fresh = [c.id for c in todo if c.id not in stale]
     failed = []
     for ids, extra in ((fresh, []), (stale, ["--force"])):
@@ -76,7 +76,7 @@ def shorts(job: Job, clips: list[Clip], force=False) -> list[int]:
             continue
         res = sh([python(), "-m", "pipeline.clipper", "--config", rp, "--clips", *ids, "--keep-temp", *extra])
         if res.returncode != 0:
-            failed += [i for i in ids if not job.short(next(c for c in clips if c.id == i)).exists()]
+            failed += [i for i in ids if not job.plain(next(c for c in clips if c.id == i)).exists()]
     return failed
 
 
@@ -142,19 +142,33 @@ def draft(job: Job, c: Clip) -> None:
     if job.plan(c).exists() or job.draft(c).exists():
         return
     music = os.path.relpath(job.edit["music"], job.edit_dir(c)) if job.edit["music"] else None
+    sh_ = job.short_of(c)
+    segment = c.mode == "segment"
+    hint = _hint_context(c)
+    beats = []
+    if "payoff_hint_t" in hint:
+        beats.append({"kind": "payoff", "t": hint["payoff_hint_t"], "focus": [540, 960],
+                      "note": "prefilled from research: pin t and focus on the look sheets before keeping it"})
+    text = {"stamp": "<1-2 WORDS, or empty for none>", "accent": job.edit["accent"]}
+    if not segment:
+        text.update(hook=["<LINE 1>", "<ACCENT LINE>"], tease=None, outro=["<LINE 1>", "<QUESTION?>"])
     tpl = {
         "name": c.key,
         "source": "source.mp4",
-        "music": {"file": music} if music else None,
-        "style": job.edit["style"],
+        "music": {"file": music} if music and not segment else None,
+        "style": c.style,
+        "mode": c.mode,
         "out_dir": "project",
-        "text": {"hook": ["<LINE 1>", "<ACCENT LINE>"], "tease": None, "stamp": "<1-2 WORDS>",
-                 "outro": ["<LINE 1>", "<QUESTION?>"], "accent": job.edit["accent"]},
-        "beats": [],
+        "text": text,
+        "beats": beats,
         "_context": {
             "label": c.label, "title": c.title, "caption": c.caption,
             "stream_range": f"{c.start}-{c.end}",
-            **_hint_context(c),
+            **hint,
+            "short": ({"key": sh_.key, "format": sh_.format, "position": sh_.clips.index(c) + 1, "of": len(sh_.clips)}
+                      if sh_ else None),
+            "mode_note": ("segment of a multi-clip short: no hook, outro or music here; the short adds them"
+                          if segment else "a whole short: hook at frame 0, outro question, music"),
             "look": ["look/overview.jpg", "look/audio_envelope.txt"],
             "detail": f"python3 -m pipeline look {job.path.relative_to(ROOT)} --clip {c.id} --detail A,B",
             "save_as": "plan.json",
@@ -184,18 +198,86 @@ def build(job: Job, c: Clip) -> tuple[bool, str]:
 
 def render_done(job: Job, c: Clip) -> bool:
     em = job.project(c) / "edit_map.json"
-    return job.final_video(c).exists() and not newer(em, job.final_video(c)) and not newer(job.master(c), job.final_video(c))
+    out = job.clip_render(c)
+    return out.exists() and not newer(em, out) and not newer(job.master(c), out)
 
 
 def render(job: Job, c: Clip, draft_only=False) -> tuple[bool, str]:
-    job.final.mkdir(parents=True, exist_ok=True)
-    out = job.final / (f"{c.key}_draft.mp4" if draft_only else f"{c.key}.mp4")
+    """A clip's edit -> renders/ (a whole short, or a segment of one)."""
+    out = job.clip_render(c)
+    if draft_only:
+        out = out.with_name(out.stem + "_draft.mp4")
+    out.parent.mkdir(parents=True, exist_ok=True)
     cmd = [sys.executable, "-m", "hypeedit", "render", job.plan(c), "-o", out] + (["--draft"] if draft_only else [])
     res = sh(cmd, quiet=True)
     text = (res.stdout or "") + (res.stderr or "")
     if res.returncode != 0:
         return False, text.strip()[-1500:]
-    if job.meta(c).exists():
-        shutil.copy2(job.meta(c), job.final / f"{c.key}.txt")
     lines = [ln for ln in text.splitlines() if ln.startswith(("rendered", "loudness", "mix is"))]
     return True, "\n".join(lines)
+
+
+# ------------------------------------------------------------------ shorts
+
+
+def _short_meta(job: Job, s) -> str:
+    first = s.clips[0]
+    title = s.title or first.title
+    caption = s.caption or first.caption
+    raw = next((x for x in job.cfg["clips"] if x["id"] == first.id), {})
+    tags = s.hashtags or raw.get("hashtags") or job.cfg.get("default_hashtags", "#Shorts")
+    return f"TITLE:\n{title}\n\nCAPTION:\n{caption}\n\nHASHTAGS:\n{tags}\n"
+
+
+def short_inputs(job: Job, s) -> list:
+    """What a short is made from; it is out of date when any of these is newer."""
+    if s.format == "single":
+        c = s.clips[0]
+        return [job.clip_render(c) if c.edit else job.plain(c)]
+    return [job.clip_render(c) for c in s.clips]
+
+
+def short_ready(job: Job, s) -> bool:
+    return all(p.exists() for p in short_inputs(job, s))
+
+
+def short_done(job: Job, s) -> bool:
+    out = job.final_short(s)
+    return out.exists() and not any(newer(p, out) for p in short_inputs(job, s))
+
+
+def make_short(job: Job, s) -> tuple[bool, str]:
+    """single: the clip's render is the short. montage/ranking: compose the segments, render."""
+    job.final.mkdir(parents=True, exist_ok=True)
+    out = job.final_short(s)
+    if s.format == "single":
+        shutil.copy2(short_inputs(job, s)[0], out)
+        text = "single: " + _rel_name(short_inputs(job, s)[0])
+    else:
+        from hypeedit import shortcompose
+
+        segs = []
+        for i, c in enumerate(s.clips):
+            payoff = None
+            em = job.project(c) / "edit_map.json"
+            if em.exists():
+                payoff = json.loads(em.read_text())["marks"].get("payoff")
+            segs.append({"path": job.clip_render(c), "payoff": payoff,
+                         "rank": (len(s.clips) - i) if s.format == "ranking" else None})
+        texts = {"header": s.header, "hook": s.hook, "outro": s.outro}
+        info = shortcompose.build(job.compose_dir(s), s.format, segs, texts, job.edit["music"], job.edit["accent"])
+        check = subprocess.run(["npx", "hyperframes", "check", "--json"], cwd=job.compose_dir(s), capture_output=True, text=True)
+        if '"ok":false' in check.stdout.replace(" ", ""):
+            return False, "compose check failed: " + check.stdout[-800:]
+        res = subprocess.run(["npx", "hyperframes", "render", "--fps", "30", "--quality", "delivery", "-o", str(out)],
+                             cwd=job.compose_dir(s), capture_output=True, text=True, env=env())
+        if res.returncode != 0 or not out.exists():
+            return False, ((res.stdout or "") + (res.stderr or ""))[-1500:]
+        text = f"{s.format}: {len(segs)} segments, {info['duration']:.1f}s; " + "; ".join(info["log"])
+    (job.final / f"{s.key}.txt").write_text(_short_meta(job, s), encoding="utf-8")
+    loud = hmedia.npx_json(["audio", str(out), "--json"])["items"][0]["loudness"]
+    return True, f"{text}\nloudness {loud['lufsIntegrated']} LUFS, true peak {loud['truePeakDb']} dB"
+
+
+def _rel_name(p) -> str:
+    return pathlib.Path(p).name

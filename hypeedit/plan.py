@@ -49,6 +49,7 @@ class Plan:
     beats: list[Beat]
     out_dir: pathlib.Path
     mix_gain_db: float = 0.0
+    mode: str = "full"  # full: a short on its own; segment: one part of a multi-clip short
     path: pathlib.Path = field(default_factory=pathlib.Path)
 
     @property
@@ -115,11 +116,14 @@ def load(path: str | pathlib.Path, source_duration: float | None = None) -> Plan
         outro=[str(x) for x in outro] if outro else None,
         accent=t.get("accent") or "#ff3030",
     )
-    if not 1 <= len(text.hook) <= 2:
+    mode = raw.get("mode", "full")
+    if mode not in ("full", "segment"):
+        errors.append(f"mode must be 'full' or 'segment', not {mode!r}")
+    if mode == "full" and not 1 <= len(text.hook) <= 2:
         errors.append("text.hook needs 1 or 2 lines (line 2 is the accent line)")
-    if not text.stamp:
-        errors.append("text.stamp is required: the word slammed on the payoff")
-    elif len(text.stamp.split()) > 2:
+    if len(text.hook) > 2:
+        errors.append("text.hook has more than 2 lines")
+    if text.stamp and len(text.stamp.split()) > 2:
         errors.append(f"text.stamp {text.stamp!r} is over 2 words")
     for line in text.hook + (text.outro or []):
         if len(line.split()) > 3:
@@ -170,5 +174,6 @@ def load(path: str | pathlib.Path, source_duration: float | None = None) -> Plan
         beats=sorted(beats, key=lambda b: b.t),
         out_dir=out_dir,
         mix_gain_db=float(raw.get("mix_gain_db", 0.0)),
+        mode=mode,
         path=path,
     )

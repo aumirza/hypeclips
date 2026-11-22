@@ -166,11 +166,16 @@ def tease(e: Edit, text: str, build_in: float, until: float):
 def payoff(e: Edit, P: float, focus, lock: bool, stamp: str):
     """The one big moment: letterbox, punch, lock, flash, jolt, stamp, riser, boom."""
     st, lv = e.st, e.st["levels"]
-    s_in, s_out = e.marks["slow_in"], e.marks["slow_out"]
+    on = st["payoff_moves"]
+    s_in = e.marks["slow_in"]
+    # the moment ends when the slow-mo does, or after the style's hold
+    s_out = max(e.marks["slow_out"], min(e.dur - 0.3, P + st["hold_after"]))
+    e.marks["slow_out"] = s_out
     fx, fy = focus
     # letterbox
     lb_in, lb_out = P - 0.6, s_out - 0.03
-    e.overlays.append(Overlay("fx-letterbox", _r(lb_in), _r(lb_out - lb_in + 0.22),
+    if "letterbox" in on:
+        e.overlays.append(Overlay("fx-letterbox", _r(lb_in), _r(lb_out - lb_in + 0.22),
                               '<div id="fx-bar-top" class="fx-bar"></div><div id="fx-bar-bot" class="fx-bar"></div>',
                               [f'tl.fromTo("#fx-bar-top", {{ yPercent: -100 }}, {{ yPercent: 0, duration: 0.25, ease: "power3.out" }}, {_r(lb_in)});',
                                f'tl.fromTo("#fx-bar-bot", {{ yPercent: 100 }}, {{ yPercent: 0, duration: 0.25, ease: "power3.out" }}, {_r(lb_in)});',
@@ -179,13 +184,15 @@ def payoff(e: Edit, P: float, focus, lock: bool, stamp: str):
                               "data-layout-ignore", "kill-cam letterbox"))
     # punch
     k = st["punch"]
-    e.zoom += [f'tl.fromTo("#zoom", {{ scale: 1 }}, {{ scale: {k}, duration: 0.5, ease: "power2.inOut", immediateRender: false }}, {_r(P - 0.55)});',
+    if "punch" in on:
+        e.zoom += [f'tl.fromTo("#zoom", {{ scale: 1 }}, {{ scale: {k}, duration: 0.5, ease: "power2.inOut", immediateRender: false }}, {_r(P - 0.55)});',
                f'tl.to("#zoom", {{ scale: {_r(k * st["punch_kick"])}, duration: 0.07, ease: "power4.out" }}, {_r(P)});',
                f'tl.to("#zoom", {{ scale: {_r(k * st["punch_settle"])}, duration: 0.6, ease: "expo.out" }}, {_r(P + 0.07)});',
                f'tl.to("#zoom", {{ scale: 1, duration: 0.3, ease: "power3.in" }}, {_r(s_out - 0.07)});']
-    e.whoosh(s_out + 0.2)
+    if "punch" in on:
+        e.whoosh(s_out + 0.2)
     # lock
-    if lock:
+    if lock and "lock" in on:
         x, y = min(max(fx - 130, 0), FRAME_W - 260), min(max(fy - 130, 0), FRAME_H - 260)
         corners = "".join(f'<div class="fx-corner fx-c-{c}"></div>' for c in ("tl", "tr", "bl", "br"))
         e.overlays.append(Overlay("fx-lock", _r(P - 0.5), 0.55,
@@ -195,13 +202,29 @@ def payoff(e: Edit, P: float, focus, lock: bool, stamp: str):
                                    f'tl.to("#fx-lock-box .fx-corner", {{ borderColor: "var(--accent)", duration: 0.04, ease: "none" }}, {_r(P - 0.13)});'],
                                   "data-layout-ignore", "target lock on the focus"))
     # flash (drawn under the letterbox: overlays are painted in list order, see project.py)
-    e.overlays.append(Overlay("fx-flash", _r(P - 0.02), 0.3, '<div id="fx-flash-fill" class="fx-full"></div>',
+    if "flash" in on:
+        e.overlays.append(Overlay("fx-flash", _r(P - 0.02), 0.3, '<div id="fx-flash-fill" class="fx-full"></div>',
                               [f'tl.fromTo("#fx-flash-fill", {{ opacity: 0 }}, {{ opacity: 0.92, duration: 0.03, ease: "none" }}, {_r(P - 0.02)});',
                                f'tl.to("#fx-flash-fill", {{ opacity: 0, duration: 0.24, ease: "expo.out" }}, {_r(P + 0.02)});'],
                               "data-layout-ignore", "impact flash"))
-    e.grade_js += [f'tl.to("#a-roll", {{ "--hf-color-grading-exposure": {st["flash_exposure"]}, "--hf-color-grading-bloom": {st["flash_bloom"]}, duration: 0.03, ease: "none" }}, {_r(P - 0.02)});',
-                   f'tl.to("#a-roll", {{ "--hf-color-grading-exposure": 0, "--hf-color-grading-bloom": 0, duration: 0.45, ease: "expo.out" }}, {_r(P + 0.02)});']
-    e.jolts.append((P, *st["jolt_payoff"]))
+        e.grade_js += [f'tl.to("#a-roll", {{ "--hf-color-grading-exposure": {st["flash_exposure"]}, "--hf-color-grading-bloom": {st["flash_bloom"]}, duration: 0.03, ease: "none" }}, {_r(P - 0.02)});',
+                       f'tl.to("#a-roll", {{ "--hf-color-grading-exposure": 0, "--hf-color-grading-bloom": 0, duration: 0.45, ease: "expo.out" }}, {_r(P + 0.02)});']
+    if "jolt" in on:
+        e.jolts.append((P, *st["jolt_payoff"]))
+    e.marks.update(payoff=_r(P), stamp=_r(P + 0.3))
+    _payoff_stamp(e, P, fx, fy, stamp, s_out, "stamp" in on)
+    if "riser" in on:
+        e.cue("riser", "riser.mp3", P, lv["riser"], dur=3.9 if P > 3.6 else None, fade_out=0.3)
+    if "boom" in on:
+        e.cue("boom", "impact-bass-1.mp3", P, lv["boom"])
+    if "glitch" in on and stamp:
+        e.cue("glitch", "glitch-1.mp3", P + 0.1, lv["glitch_stamp"], dur=1.2, fade_out=0.3)
+
+
+def _payoff_stamp(e: Edit, P: float, fx: float, fy: float, stamp: str, s_out: float, enabled: bool):
+    if not (enabled and stamp):
+        return
+    st = e.st
     # stamp: above the focus, or below it when the focus sits high
     stamp_h = 220
     top = fy - 475 if fy - 475 >= 300 else fy + 200
@@ -218,11 +241,6 @@ def payoff(e: Edit, P: float, focus, lock: bool, stamp: str):
                                f'tl.fromTo("#fx-stamp-c", {{ opacity: 0.9, x: -22, y: 6 }}, {{ opacity: 0, x: 0, y: 0, duration: 0.45, ease: "power3.out" }}, {_r(t0 + 0.03)});',
                                f'tl.to("#fx-stamp-wrap", {{ scale: 1.2, opacity: 0, filter: "blur(14px)", duration: 0.2, ease: "power3.in" }}, {_r(s_out - 0.07)});'],
                               "data-layout-allow-overflow data-layout-allow-overlap", "payoff stamp"))
-    # sound
-    e.cue("riser", "riser.mp3", P, lv["riser"], dur=3.9 if P > 3.6 else None, fade_out=0.3)
-    e.cue("boom", "impact-bass-1.mp3", P, lv["boom"])
-    e.cue("glitch", "glitch-1.mp3", P + 0.1, lv["glitch_stamp"], dur=1.2, fade_out=0.3)
-    e.marks.update(payoff=_r(P), stamp=_r(P + 0.3))
 
 
 def hits(e: Edit, hit_beats: list[tuple[float, bool]]):
@@ -309,16 +327,18 @@ def compose(plan: Plan, tm, win, st: dict, music_start: float | None) -> Edit:
     build_in = tm.out(builds[0].t) if builds else None
 
     ramp(e, tm, win)
-    hook(e, plan.text.hook, whip_t, build_in)
-    if plan.text.tease and builds:
+    full = plan.mode == "full"  # a segment gets its hook, outro and music from the short around it
+    if full and plan.text.hook:
+        hook(e, plan.text.hook, whip_t, build_in)
+    if full and plan.text.tease and builds:
         b = builds[0]
         tease(e, plan.text.tease, tm.out(b.t), min(tm.out(b.end) + 1.0, P - 0.6))
     payoff(e, P, focus, plan.payoff.lock, plan.text.stamp)
     hits(e, [(tm.out(b.t), b.hurt) for b in plan.of_kind("hit")])
     whips(e, whip_t)
-    if plan.text.outro:
+    if full and plan.text.outro:
         outro(e, plan.text.outro)
-    if music_start is not None:
+    if full and music_start is not None:
         bed(e, music_start, P)
 
     g = 10 ** (plan.mix_gain_db / 20)
@@ -330,7 +350,7 @@ def compose(plan: Plan, tm, win, st: dict, music_start: float | None) -> Edit:
 
 def fx_variables(plan: Plan) -> str:
     t = plan.text
-    hook_top, hook_main = (t.hook[0], t.hook[1]) if len(t.hook) == 2 else ("", t.hook[0])
+    hook_top, hook_main = (t.hook[0], t.hook[1]) if len(t.hook) == 2 else ("", t.hook[0] if t.hook else "")
     out_top, out_main = ((t.outro[0], t.outro[1]) if len(t.outro) == 2 else ("", t.outro[0])) if t.outro else ("", "")
     v = [("hook_top", "Hook line 1", hook_top), ("hook_main", "Hook line 2", hook_main), ("tease", "Tease line", t.tease or ""),
          ("stamp", "Payoff stamp", t.stamp), ("outro_top", "Outro line 1", out_top), ("outro_main", "Outro line 2", out_main)]

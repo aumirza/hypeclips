@@ -131,33 +131,119 @@ def verify_sheets(items: list[dict], url: str, vdir: pathlib.Path, cookies: list
 _SLUG = re.compile(r"[^a-z0-9]+")
 
 
+def _slug(text: str, fallback: str) -> str:
+    return _SLUG.sub("_", (text or fallback).lower()).strip("_")[:40] or fallback
+
+
+def _shorts_of(selection: dict) -> list[dict]:
+    """selection.json -> proposed shorts. A plain {"clips": [...]} means one single short per clip."""
+    if selection.get("shorts"):
+        return selection["shorts"]
+    return [{"format": "single", "clips": [c]} for c in selection.get("clips") or []]
+
+
+def _ref(entry) -> dict:
+    return {"id": entry} if isinstance(entry, str) else dict(entry)
+
+
+def _fit_segment(m: dict, lo_hi: list[float]) -> None:
+    """Trim a clip used inside a multi-clip short to the format's segment length, around its payoff."""
+    lo, hi = lo_hi
+    s, e = parse_t(m["start"]), parse_t(m["end"])
+    p = parse_t(m["payoff"]) if m.get("payoff") else None
+    if e - s > hi:
+        s = max(s, (p - 0.55 * hi) if p is not None else s)
+        e = s + hi
+    m["start"], m["end"] = hmsf(s), hmsf(e)
+
+
+def proposal(short: list[dict], selection: dict, r: dict, url: str, path: pathlib.Path) -> None:
+    by_id = {s["id"]: s for s in short}
+    out = ["# Proposed shorts", "",
+           f"Request: {r['request'] or '(none: recommendations)'}  ",
+           f"Status: {'CONFIRMED' if selection.get('confirmed') else 'waiting for confirmation'}", ""]
+    for n, sh in enumerate(_shorts_of(selection), 1):
+        fmt = sh.get("format", "single")
+        name = sh.get("header") or sh.get("title") or ""
+        out += [f"## {n}. {fmt}: {name}", ""]
+        if sh.get("hook"):
+            out.append(f"Hook: {' / '.join(sh['hook']) if isinstance(sh['hook'], list) else sh['hook']}  ")
+        if sh.get("outro"):
+            out.append(f"Outro: {' / '.join(sh['outro']) if isinstance(sh['outro'], list) else sh['outro']}  ")
+        rows = ["| # | id | kind | start - end | len | payoff | what | preview | verify sheet |", "|---|---|---|---|---|---|---|---|---|"]
+        total = 0.0
+        for k, ref in enumerate(sh.get("clips") or [], 1):
+            ref = _ref(ref)
+            base = by_id.get(ref["id"], {})
+            m = {**base, **{x: v for x, v in ref.items() if v not in (None, "")}}
+            if fmt in r["segment_length"] and m.get("start"):
+                _fit_segment(m, r["segment_length"][fmt])
+            if not m.get("start"):
+                rows.append(f"| {k} | {ref['id']} | ? | unknown id | | | | | |")
+                continue
+            ln = parse_t(m["end"]) - parse_t(m["start"])
+            total += ln
+            rank = f"#{len(sh['clips']) - k + 1}" if fmt == "ranking" else str(k)
+            link = f"{url}{'&' if '?' in url else '?'}t={int(parse_t(m['start']))}s"
+            rows.append(f"| {rank} | {ref['id']} | {m.get('kind', '')} | {m['start']} - {m['end']} | {ln:.0f}s | "
+                        f"{m.get('payoff') or ''} | {m.get('hook') or m.get('title', '')} | {link} | {m.get('sheet') or ''} |")
+        out += rows + ["", f"About {total:.0f}s.", ""]
+    path.write_text("\n".join(out) + "\n")
+
+
 def finalize(job_path: pathlib.Path, job_cfg: dict, r: dict, short: list[dict], selection: dict, backup_dir: pathlib.Path) -> int:
     by_id = {s["id"]: s for s in short}
-    clips = []
-    for i, sel in enumerate(selection.get("clips") or [], 1):
-        base = by_id.get(sel.get("id"))
-        if not base:
-            raise SystemExit(f"selection.json: unknown id {sel.get('id')!r} (shortlist ids: {', '.join(by_id)})")
-        m = {**base, **{k: v for k, v in sel.items() if v not in (None, "")}}
-        kind = r["kinds"][m["kind"]]
-        slug = _SLUG.sub("_", (m.get("slug") or m.get("title") or m["id"]).lower()).strip("_")[:40]
-        tags = list(dict.fromkeys(list(r.get("hashtags") or []) + list(m.get("hashtags") or [])))
-        clips.append({
-            "id": i, "slug": slug, "label": m.get("label") or m.get("title") or slug,
-            "start": hmsf(parse_t(m["start"])), "end": hmsf(parse_t(m["end"])),
-            "title": m.get("title", ""), "caption": m.get("caption", ""),
-            **({"hashtags": " ".join(tags)} if tags else {}),
-            "audio": {"source": kind.get("audio", "original")},
-            "edit": bool(kind.get("edit", True)),
-            "hint": {"kind": m["kind"], "payoff": m.get("payoff"), "hook": m.get("hook", ""), "why": m.get("why", ""),
-                     "score": m.get("score")},
+    clips, shorts, used = [], [], {}
+    for n, sh in enumerate(_shorts_of(selection), 1):
+        fmt = sh.get("format", "single")
+        ids = []
+        for ref in sh.get("clips") or []:
+            ref = _ref(ref)
+            base = by_id.get(ref.get("id"))
+            if not base:
+                raise SystemExit(f"selection.json: unknown id {ref.get('id')!r} (shortlist ids: {', '.join(by_id)})")
+            if ref["id"] in used:
+                raise SystemExit(f"selection.json: {ref['id']} is used twice; a clip belongs to one short")
+            m = {**base, **{k: v for k, v in ref.items() if v not in (None, "")}}
+            if fmt in r["segment_length"]:
+                _fit_segment(m, r["segment_length"][fmt])
+            kind = r["kinds"][m["kind"]]
+            cid = len(clips) + 1
+            used[ref["id"]] = cid
+            tags = list(dict.fromkeys(list(r.get("hashtags") or []) + list(m.get("hashtags") or [])))
+            clips.append({
+                "id": cid, "slug": _slug(m.get("slug") or m.get("hook") or m.get("title"), m["id"]),
+                "label": m.get("label") or m.get("title") or m["id"],
+                "start": hmsf(parse_t(m["start"])), "end": hmsf(parse_t(m["end"])),
+                "title": m.get("title", ""), "caption": m.get("caption", ""),
+                **({"hashtags": " ".join(tags)} if tags else {}),
+                "audio": {"source": kind.get("audio", "original")},
+                "edit": bool(kind.get("edit", True)),
+                "style": kind.get("style", "phonk-hype"),
+                "hint": {"kind": m["kind"], "payoff": m.get("payoff"), "hook": m.get("hook", ""), "why": m.get("why", ""),
+                         "score": m.get("score")},
+            })
+            ids.append(cid)
+        if not ids:
+            continue
+        first = clips[ids[0] - 1]
+        tags = sh.get("hashtags")
+        tags = " ".join(tags) if isinstance(tags, list) else (tags or first.get("hashtags", ""))
+        shorts.append({
+            "id": n, "slug": _slug(sh.get("slug") or sh.get("header") or sh.get("title"), first["slug"]),
+            "format": fmt, "clips": ids,
+            "title": sh.get("title") or first["title"], "caption": sh.get("caption") or first["caption"],
+            **({"hashtags": tags} if tags else {}),
+            **({"header": sh["header"]} if sh.get("header") else {}),
+            **({"hook": sh["hook"]} if sh.get("hook") else {}),
+            **({"outro": sh["outro"]} if sh.get("outro") else {}),
         })
     if not clips:
         raise SystemExit("selection.json has no clips")
     backup_dir.mkdir(parents=True, exist_ok=True)
     (backup_dir / f"{job_path.stem}.before-finalize.json").write_text(job_path.read_text())
     cfg = json.loads(job_path.read_text())
-    cfg["clips"] = clips
+    cfg["clips"], cfg["shorts"] = clips, shorts
     job_path.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + "\n")
     return len(clips)
 

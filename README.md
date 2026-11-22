@@ -1,10 +1,14 @@
 # hypeclips
 
-Turn timestamps from a long gameplay stream into vertical shorts, then into **hype edits**: speed ramps, slow-mo on the payoff, punch-ins, shake, flashes, stamp text, sound effects and a music drop timed to the payoff, rendered with [HyperFrames](https://hyperframes.heygen.com).
+Give it a stream URL; get finished vertical YouTube shorts with sound and visual effects, rendered with [HyperFrames](https://hyperframes.heygen.com).
 
-This project only makes clips: one finished short per timestamp range. Combining clips (rankings, compilations) is a separate project that consumes `workspace/<job>/final/`.
+- **Ask for something** ("gunfight shorts", "top 5 car stunts ranking") and it finds matching moments; **ask for nothing** and it recommends what the stream is good for.
+- Every proposal comes back as **timestamps with preview links and 360p verify sheets for you to confirm** before anything is made.
+- A short is **one clip** (single), **2-3 clips** (montage) or a **countdown** (ranking, #N to #1).
+- Gameplay clips get the `phonk-hype` edit (speed ramps, slow-mo payoff, kill-cam, punch-ins, shake, flash, stamp, music drop); reaction and funny clips get the `talk` edit (voice kept, punch-in on the punchline, quiet bed). Montages and rankings add the title or header, cuts, rank slams, one music bed and an outro question.
+- Any game or content, any caption language (non-Latin captions are romanized for reading); nothing is GTA-specific.
 
-Built to be driven by an AI agent (Claude Code): give it a stream URL and a one-line brief, and it researches the stream (captions, comment timestamps, chat, speaker loudness), picks and visually verifies the moments, writes an edit plan per clip from the frames, reviews, and renders. Any game or content and any caption language; nothing is GTA-specific.
+Built to be driven by an AI agent (Claude Code): it reads the stream's captions and signals, picks and verifies moments, writes each clip's edit plan from the frames, reviews, and renders. The `clip-pipeline` and `hype-edit` skills in `.claude/skills/` carry the workflow and the style.
 
 ## Setup
 
@@ -23,20 +27,21 @@ python3 -m pipeline look   jobs/carry_gta6.json --clip 3 --detail 5.2,6.1
 python3 -m pipeline render jobs/carry_gta6.json   # final renders -> workspace/carry_gta6/final/
 ```
 
-`run` is resumable: each stage checks its own outputs and redoes only what is missing or stale. Between `run` and `render` sit two editorial gates: a `plan.json` per clip (written from `plan.draft.json` after reading the clip's frames) and a review of each build's snapshot sheet. With Claude Code, ask it to process a job; the `clip-pipeline` and `hype-edit` skills in `.claude/skills/` carry the workflow and the style.
+Every command is resumable: each stage checks its own outputs and redoes only what is missing or stale. The editorial gates: picks, selection and **your confirmation** (research), a `plan.json` per clip, and a review of each build's snapshot sheet.
 
 ## Pipeline
 
 | stage | what | output in `workspace/<job>/` |
 | --- | --- | --- |
 | research | captions (romanized if needed), comment/chat/heatmap/loudness signals, hot windows, AI picks, 360p verify sheets, AI selection; writes `clips` into the job | `research/` |
-| short | download at `download.max_height` (1440p), 9:16 crop, demucs strips the streamer's voice, plain short | `shorts/` |
+| cut | download at `download.max_height` (1440p), 9:16 crop, voice separation per clip, plain cut | `shorts/` |
 | proxy | 540×960 edit source | `edits/<clip>/source_proxy.mp4` |
 | look | timestamped contact sheet + audio envelope | `edits/<clip>/look/` |
 | draft | plan template | `edits/<clip>/plan.draft.json` |
 | master | 1080×1920 sharpened edit source | `edits/<clip>/source.mp4` |
 | build | plan → HyperFrames project, check, snapshot sheet | `edits/<clip>/project/` |
-| render | master render, loudness check, post text | `final/<clip>.mp4`, `.txt` |
+| render | each clip's edit (a whole short, or a segment of one) | `renders/<clip>.mp4` |
+| short | single: the clip's render; montage/ranking: segments composed with cuts, rank slams, music bed, outro; loudness check, post text | `final/<short>.mp4`, `.txt` |
 
 ## Layout
 

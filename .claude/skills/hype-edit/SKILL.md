@@ -11,6 +11,8 @@ Inside a job, `/clip-pipeline` runs everything around the plan (sources, sheets,
 
 The vocabulary (beats, moves, text slots, plan schema) is [references/vocabulary.md](references/vocabulary.md): read it before writing a plan. How to read beats in a given kind of footage (shooter, driving/stunt, sports, other) is [references/genres.md](references/genres.md).
 
+**Styles and modes.** The draft names both. `phonk-hype` is for gameplay (slow-mo payoff, kill-cam, stamp, boom, music drop); `talk` is for reactions and funny bits (the voice is the point: no slow-mo, a gentle punch-in on the punchline, an optional stamp, a quiet music bed). Mode `full` makes the clip a whole short (hook at frame 0, outro question, music); `segment` makes it one part of a montage or ranking, so it has no hook, outro or music, and its plan needs only beats and an optional stamp.
+
 **Proxy and master.** Sheets, builds, snaps and the Studio preview use the 540×960 proxy; only the final render uses the 1080×1920 master. Plans are in source seconds and output pixels, so they hold for both.
 
 ## Writing a plan
@@ -25,7 +27,7 @@ A rebuild overwrites the generated `project/`. If the person edited it in the Hy
 
 ## Taste
 
-The phonk-hype style, learned on the clip 03 headshot. Numbers live in `hypeedit/style.py`; these are the rules behind them.
+The phonk-hype style, learned on the clip 03 headshot (`talk` keeps the same type and safe-zone rules, without the slow-mo and kill-cam). Numbers live in `hypeedit/style.py`; these are the rules behind them.
 
 - **One payoff.** Every clip has exactly one; it gets the slow-mo, the punch, the flash, the stamp, the boom and the music drop. Secondary impacts are hits and get a fraction of that.
 - **Frame 0 is the thumbnail.** The hook is fully on screen at frame 0 and leaves on the first whip.

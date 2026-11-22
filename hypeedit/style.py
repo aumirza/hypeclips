@@ -53,9 +53,42 @@ PHONK_HYPE = {
         "max_text_width": 800,  # px; keeps clear of the Shorts/TikTok action rail
     },
     "outro_hold": 2.2,
+    # which payoff moves this style uses, and how long the moment is held after the payoff frame
+    "payoff_moves": {"letterbox", "punch", "lock", "flash", "jolt", "stamp", "riser", "boom", "glitch"},
+    "hold_after": 0.0,  # 0 = until the slow-mo ends
 }
 
-STYLES = {"phonk-hype": PHONK_HYPE}
+# talk: for reactions, funny bits, hot takes. The voice is the point, so no slow-mo or
+# kill-cam; a gentle punch-in and a soft hit on the punchline, a quiet music bed under the voice.
+TALK = {
+    **PHONK_HYPE,
+    "build_rate": 1.0,
+    "lull_rate": 1.15,
+    "slow_rate": 1.0,
+    "punch": 1.12,
+    "punch_kick": 1.04,
+    "punch_settle": 1.0,
+    "jolt_payoff": (10, 0.25),
+    "grade": {
+        "preset": "deep-contrast",
+        "intensity": 0.6,
+        "adjust": {"saturation": 0.12, "vibrance": 0.1},
+        "details": {"vignette": 0.25, "grain": 0.03, "grainSize": 0.15},
+    },
+    "levels": {
+        **PHONK_HYPE["levels"],
+        "game": 0.9,  # the voice
+        "game_slowmo": 1.0,
+        "music": 0.09,
+        "music_lane": {"base": 1.0, "dip": 0.8, "drop": 1.25},
+        "boom": 0.16,
+        "whoosh": 0.18,
+    },
+    "payoff_moves": {"punch", "jolt", "stamp", "boom"},
+    "hold_after": 1.6,
+}
+
+STYLES = {"phonk-hype": PHONK_HYPE, "talk": TALK}
 
 
 def get(name: str) -> dict:

@@ -31,7 +31,7 @@ def _rel(p) -> str:
 def status_rows(job: Job, clips):
     rows = []
     for c in clips:
-        r = {"clip": c.key, "short": "done" if stages.short_done(job, c) else ("stale" if job.short(c).exists() else "-")}
+        r = {"clip": c.key, "cut": "done" if stages.plain_done(job, c) else ("stale" if job.plain(c).exists() else "-")}
         if not c.edit:
             r.update(proxy="off", look="off", plan="off", master="off", build="off", render="off")
             rows.append((c, r))
@@ -41,25 +41,31 @@ def status_rows(job: Job, clips):
         r["plan"] = "done" if job.plan(c).exists() else ("draft" if job.draft(c).exists() else "-")
         r["master"] = "done" if job.master(c).exists() else "-"
         r["build"] = "done" if stages.build_done(job, c) else ("stale" if (job.project(c) / "edit_map.json").exists() else "-")
-        r["render"] = "done" if stages.render_done(job, c) else ("stale" if job.final_video(c).exists() else "-")
+        r["render"] = "done" if stages.render_done(job, c) else ("stale" if job.clip_render(c).exists() else "-")
         rows.append((c, r))
     return rows
 
 
 def print_status(job: Job, clips):
     rows = status_rows(job, clips)
-    cols = ["clip", "short", "proxy", "look", "plan", "master", "build", "render"]
+    cols = ["clip", "cut", "proxy", "look", "plan", "master", "build", "render"]
     w = max(len(r["clip"]) for _, r in rows) + 2
     print("\n" + "clip".ljust(w) + "".join(c.ljust(8) for c in cols[1:]))
     for _, r in rows:
         print(r["clip"].ljust(w) + "".join(r[c].ljust(8) for c in cols[1:]))
+    shorts = job.select_shorts([c.id for c in clips])
+    sw = max(len(s.key) for s in shorts) + 2 if shorts else 10
+    print("\n" + "short".ljust(sw) + "format    clips      final")
+    for s in shorts:
+        state = "done" if stages.short_done(job, s) else ("ready" if stages.short_ready(job, s) else "-")
+        print(s.key.ljust(sw) + s.format.ljust(10) + ",".join(str(c.id) for c in s.clips).ljust(11) + state)
     nxt = []
     for c, r in rows:
         if r["plan"] == "off":
             continue
-        if r["short"] != "done":
-            why = "below download.max_height" if r["short"] == "stale" else "missing"
-            nxt.append(f"{c.key}: short {why} -> `run` (re)downloads and re-makes it")
+        if r["cut"] != "done":
+            why = "below download.max_height" if r["cut"] == "stale" else "missing"
+            nxt.append(f"{c.key}: cut {why} -> `run` (re)downloads and re-makes it")
         elif r["plan"] != "done":
             nxt.append(f"{c.key}: NEEDS PLAN -> read {_rel(job.look_dir(c))}/, fill {_rel(job.draft(c))}, save as plan.json")
         elif r["build"] != "done":
@@ -67,7 +73,10 @@ def print_status(job: Job, clips):
         elif r["render"] != "done":
             sheets = job.snap_sheets(c)
             nxt.append(f"{c.key}: REVIEW {', '.join(_rel(s) for s in sheets) or '(no snap sheet)'} -> fix plan.json and `run`, or `render`")
-    print("\nnext:" if nxt else "\nall selected clips are rendered: " + _rel(job.final))
+    for s in shorts:
+        if not stages.short_done(job, s) and stages.short_ready(job, s):
+            nxt.append(f"{s.key}: clips rendered -> `render` makes the short")
+    print("\nnext:" if nxt else "\nall selected shorts are done: " + _rel(job.final))
     for n in nxt:
         print("  - " + n)
 
@@ -89,8 +98,8 @@ def cmd_run(a):
     clips = job.select(a.clips)
     print(f"job {job.name}: {len(clips)} clips -> {_rel(job.ws)}")
 
-    print("\n[short] download + crop + game audio + plain short")
-    failed = stages.shorts(job, clips, force=a.force_shorts)
+    print("\n[cut] download + crop + voice separation + plain cut")
+    failed = stages.plain_cuts(job, clips, force=a.force_shorts)
     for i in failed:
         print(f"  FAILED clip {i}")
     edit = [c for c in clips if c.edit and job.raw(c).exists()]
@@ -132,13 +141,12 @@ def cmd_status(a):
 def cmd_render(a):
     job = Job(a.job)
     _need_clips(job)
-    clips = [c for c in job.select(a.clips) if c.edit]
-    for c in clips:
+    for c in [c for c in job.select(a.clips) if c.edit]:
         if not stages.build_done(job, c):
             print(f"{c.key}: not built (or plan changed since build); `run` first")
             continue
         if not a.draft and not a.force and stages.render_done(job, c):
-            print(f"{c.key}: up to date ({_rel(job.final_video(c))})")
+            print(f"{c.key}: up to date ({_rel(job.clip_render(c))})")
             continue
         if not a.draft and not job.master(c).exists():
             print(f"{c.key}: master missing; `run` without --no-master first")
@@ -146,6 +154,16 @@ def cmd_render(a):
         print(f"{c.key}: rendering {'draft' if a.draft else 'master'} ...", flush=True)
         ok, out = stages.render(job, c, draft_only=a.draft)
         print("  " + out.replace("\n", "\n  ") if ok else f"  RENDER FAILED\n  {out}")
+    if not a.draft:
+        for s in job.select_shorts(a.clips):
+            if not stages.short_ready(job, s):
+                continue
+            if not a.force and stages.short_done(job, s):
+                print(f"{s.key}: up to date ({_rel(job.final_short(s))})")
+                continue
+            print(f"{s.key}: making the {s.format} short ...", flush=True)
+            ok, out = stages.make_short(job, s)
+            print("  " + out.replace("\n", "\n  ") if ok else f"  SHORT FAILED\n  {out}")
     print_status(job, job.select(a.clips))
 
 

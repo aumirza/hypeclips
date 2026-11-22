@@ -9,8 +9,11 @@ from __future__ import annotations
 import copy
 
 DEFAULTS = {
-    # free text the picker reads first: what the stream is, who, what kind of clips you want
+    # free text the picker reads first: what the stream is, who, its language
     "brief": "",
+    # what the person asked for, in their words: "gunfight shorts", "top 5 car stunts ranking".
+    # Empty: research recommends a mix of shorts (singles, montages, rankings) for them to confirm.
+    "request": "",
     "count": 8,  # clips to end up with
     "min_score": 7,  # 0-10; picks below are dropped, never quietly lowered
     # caption tracks to try in order: a language code ("en"), or "orig" (the stream's own
@@ -34,17 +37,19 @@ DEFAULTS = {
     "chunk_min": 10,  # chunk length for scan="full"
     # moment kinds: allowed lengths, which audio the short keeps, and whether it gets a hype edit
     "kinds": {
-        "action": {"length": [8, 25], "audio": "no_voice", "edit": True,
+        "action": {"length": [8, 25], "audio": "no_voice", "style": "phonk-hype",
                    "means": "something happens in the game: kill, stunt, crash, clutch, chase"},
-        "fail": {"length": [8, 30], "audio": "no_voice", "edit": True,
+        "fail": {"length": [8, 30], "audio": "no_voice", "style": "phonk-hype",
                  "means": "a plan goes wrong in the game: death, wreck, getting caught"},
-        "reaction": {"length": [12, 45], "audio": "original", "edit": False,
+        "reaction": {"length": [12, 45], "audio": "original", "style": "talk",
                      "means": "the streamer's reaction is the point: freakout, disbelief, first look"},
-        "funny": {"length": [10, 40], "audio": "original", "edit": False,
+        "funny": {"length": [10, 40], "audio": "original", "style": "talk",
                   "means": "a joke, bit or chat interaction that lands without setup"},
-        "hot_take": {"length": [12, 45], "audio": "original", "edit": False,
+        "hot_take": {"length": [12, 45], "audio": "original", "style": "talk",
                      "means": "a strong opinion people will argue about"},
     },
+    # segment lengths inside multi-clip shorts (a ranking of 5 should stay near a minute)
+    "segment_length": {"montage": [6, 15], "ranking": [6, 12]},
     "max_per_kind": None,  # e.g. 4: variety cap per kind in the final shortlist
     "verify": True,  # 360p contact sheets of each shortlisted moment
     "output_language": "en",  # titles, hooks and captions are written in this language

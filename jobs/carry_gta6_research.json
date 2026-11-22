@@ -33,43 +33,46 @@
     "hashtags": [
       "#GTA6",
       "#GTAVI"
-    ]
+    ],
+    "request": ""
   },
   "clips": [
     {
       "id": 1,
-      "slug": "gta6_refused_the_kiss",
-      "label": "GTA 6 Refused the Kiss",
-      "start": "07:13:27.0",
-      "end": "07:14:06.0",
-      "title": "Carry begs GTA 6 to show the kiss... it doesn't",
-      "caption": "More excited than the characters themselves 😭 L or W from Rockstar?",
-      "hashtags": "#GTA6 #GTAVI #CarryMinati #Lucia",
+      "slug": "caught_in_the_very_first_minutes_of_gta_",
+      "label": "Caught in the very first minutes of GTA 6",
+      "start": "00:25:10.9",
+      "end": "00:25:22.9",
+      "title": "Caught in the very first minutes of GTA 6",
+      "caption": "The bait didn't last long 😭 How fast did you get caught?",
+      "hashtags": "#GTA6 #GTAVI #CarryMinati",
       "audio": {
-        "source": "original"
+        "source": "no_voice"
       },
-      "edit": false,
+      "edit": true,
+      "style": "phonk-hype",
       "hint": {
-        "kind": "reaction",
-        "payoff": "07:13:50.0",
-        "hook": "GTA 6 REFUSED TO SHOW THE KISS",
-        "why": "loudest stretch of the stream (LOUD +10..+13dB), 'dikhao! no! nahi dikhaya... thoda to chummi dikha de bhai... L GTA'; comments 'reason rockstar took 13 years' (66 likes), 'more excited than the characters', 'meme material'",
-        "score": 8.5
+        "kind": "fail",
+        "payoff": "00:25:17.5",
+        "hook": "CAUGHT IN THE FIRST MINUTES",
+        "why": "'are are are' LOUD +5dB then 'meri baiting khatam, main pakda gaya, starting mein hi pakda gaya'; must check on the verify sheet that the catch is visible",
+        "score": 7.0
       }
     },
     {
       "id": 2,
-      "slug": "street_fight_slap_fest",
-      "label": "Street Fight Slap Fest",
-      "start": "07:09:19.6",
-      "end": "07:09:53.8",
+      "slug": "gta_6_street_fight_turns_into_a_slap_fes",
+      "label": "GTA 6 street fight turns into a slap fest",
+      "start": "07:09:29.4",
+      "end": "07:09:41.4",
       "title": "GTA 6 street fight turns into a slap fest",
       "caption": "Thappad after thappad 😂 Who wins this fight?",
       "hashtags": "#GTA6 #GTAVI #CarryMinati #Lucia",
       "audio": {
         "source": "original"
       },
-      "edit": false,
+      "edit": true,
+      "style": "talk",
       "hint": {
         "kind": "funny",
         "payoff": "07:09:36",
@@ -80,29 +83,30 @@
     },
     {
       "id": 3,
-      "slug": "caught_in_first_minutes",
-      "label": "Caught in the First Minutes",
-      "start": "00:25:04.0",
-      "end": "00:25:24.0",
-      "title": "Caught in the very first minutes of GTA 6",
-      "caption": "The bait didn't last long 😭 How fast did you get caught?",
-      "hashtags": "#GTA6 #GTAVI #CarryMinati",
+      "slug": "carry_begs_gta_6_to_show_the_kiss_it_doe",
+      "label": "Carry begs GTA 6 to show the kiss... it doesn't",
+      "start": "07:13:43.4",
+      "end": "07:13:55.4",
+      "title": "Carry begs GTA 6 to show the kiss... it doesn't",
+      "caption": "More excited than the characters themselves 😭 L or W from Rockstar?",
+      "hashtags": "#GTA6 #GTAVI #CarryMinati #Lucia",
       "audio": {
-        "source": "no_voice"
+        "source": "original"
       },
       "edit": true,
+      "style": "talk",
       "hint": {
-        "kind": "fail",
-        "payoff": "00:25:17.5",
-        "hook": "CAUGHT IN THE FIRST MINUTES",
-        "why": "'are are are' LOUD +5dB then 'meri baiting khatam, main pakda gaya, starting mein hi pakda gaya'; must check on the verify sheet that the catch is visible",
-        "score": 7.0
+        "kind": "reaction",
+        "payoff": "07:13:50.0",
+        "hook": "GTA 6 REFUSED TO SHOW THE KISS",
+        "why": "loudest stretch of the stream (LOUD +10..+13dB), 'dikhao! no! nahi dikhaya... thoda to chummi dikha de bhai... L GTA'; comments 'reason rockstar took 13 years' (66 likes), 'more excited than the characters', 'meme material'",
+        "score": 8.5
       }
     },
     {
       "id": 4,
-      "slug": "first_seconds_of_gta6",
-      "label": "First Seconds of GTA 6",
+      "slug": "carry_s_reaction_to_the_very_first_secon",
+      "label": "Carry's reaction to the very first seconds of GTA 6",
       "start": "00:04:34.3",
       "end": "00:05:18.1",
       "title": "Carry's reaction to the very first seconds of GTA 6",
@@ -111,7 +115,8 @@
       "audio": {
         "source": "original"
       },
-      "edit": false,
+      "edit": true,
+      "style": "talk",
       "hint": {
         "kind": "reaction",
         "payoff": "00:04:50.0",
@@ -119,48 +124,37 @@
         "why": "countdown 6-5-4-3-2-1 then screaming as the game starts, LOUD +6/+7dB, comment '04:08 to 05:08' (9 likes)",
         "score": 7.0
       }
+    }
+  ],
+  "shorts": [
+    {
+      "id": 1,
+      "slug": "top_3_wildest_gta_6_moments",
+      "format": "ranking",
+      "clips": [
+        1,
+        2,
+        3
+      ],
+      "title": "Top 3 wildest moments from Carry's first GTA 6 stream",
+      "caption": "#1 had him begging the game 😭 Which one was your favourite?",
+      "hashtags": "#GTA6 #GTAVI #CarryMinati",
+      "header": "TOP 3 WILDEST GTA 6 MOMENTS",
+      "outro": [
+        "WHICH ONE",
+        "WAS YOUR #1?"
+      ]
     },
     {
-      "id": 5,
-      "slug": "thirteen_years_waiting",
-      "label": "13 Years Waiting",
-      "start": "00:02:55.8",
-      "end": "00:03:34.4",
-      "title": "Carry gets emotional: 13 years waiting for GTA 6",
-      "caption": "He was 13 when GTA 5 came out 🥲 How old were you?",
-      "hashtags": "#GTA6 #GTAVI #CarryMinati",
-      "audio": {
-        "source": "original"
-      },
-      "edit": false,
-      "hint": {
-        "kind": "reaction",
-        "payoff": "00:03:24.0",
-        "hook": "13 YEARS OF WAITING FOR GTA 6",
-        "why": "self-contained nostalgic monologue: 'GTA5 came out 13 years ago, I was 13, now I'm 27, some of us are married with kids'",
-        "score": 7.0
-      }
-    },
-    {
-      "id": 6,
-      "slug": "dating_app_neighbour",
-      "label": "Dating App Neighbour",
-      "start": "06:51:11.7",
-      "end": "06:51:51.4",
-      "title": "Swiping on GTA 6's dating app and finding his neighbour",
-      "caption": "Wait, that's literally his padosan 😂 Would you swipe right?",
-      "hashtags": "#GTA6 #GTAVI #CarryMinati",
-      "audio": {
-        "source": "original"
-      },
-      "edit": false,
-      "hint": {
-        "kind": "funny",
-        "payoff": "06:51:39.0",
-        "hook": "GTA 6 DATING APP FOUND HIS NEIGHBOUR",
-        "why": "in-game dating app swipes on screen ('disalaik', profiles read out), punchline 'ye to hamari padosan hai bhai' twice, LOUD +4dB; visual check: the app UI should be on screen",
-        "score": 7.0
-      }
+      "id": 2,
+      "slug": "carry_s_reaction_to_the_very_first_secon",
+      "format": "single",
+      "clips": [
+        4
+      ],
+      "title": "Carry's reaction to the very first seconds of GTA 6",
+      "caption": "Countdown, then pure screaming 😭 Were you this hyped too?",
+      "hashtags": "#GTA6 #GTAVI #CarryMinati"
     }
   ]
 }
