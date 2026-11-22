@@ -7,5 +7,6 @@ Stream timestamps in, one hype-edited vertical short per clip out; combining cli
 - `hypeedit/` the edit library: plan → HyperFrames project (vocabulary in `.claude/skills/hype-edit/references/`)
 - `assets/music/` local tracks, git-ignored
 - `workspace/<job>/` every generated file, git-ignored
+- `docs/` architecture, findings from real runs, history and open items (read `docs/open-items.md` before continuing work)
 
 Generated media and downloads go only under `workspace/`. Python tools (yt-dlp, demucs) live in `.venv`; the pipeline puts `.venv/bin` on PATH itself, so plain `python3` runs it. After changing `pipeline/clipper.py`, run `python3 -m pipeline.clipper --self-test`.
