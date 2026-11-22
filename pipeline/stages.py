@@ -86,8 +86,12 @@ def shorts(job: Job, clips: list[Clip], force=False) -> list[int]:
 def _prep(job: Job, c: Clip, master: bool):
     crop = job.cfg["crop"]
     job.edit_dir(c).mkdir(parents=True, exist_ok=True)
-    info = hmedia.prep(job.raw(c), job.master(c), audio=job.game_audio(c), trim_top=crop.get("trim_top", 0.04),
-                       trim_bottom=crop.get("trim_bottom", 0.10), x_offset=crop.get("x_offset", 0.0), master=master)
+    audio, warn = job.edit_audio(c)
+    if warn:
+        print(f"  WARNING {warn}")
+    info = hmedia.prep(job.raw(c), job.master(c), audio=audio, trim_top=crop.get("trim_top", 0.04),
+                       trim_bottom=crop.get("trim_bottom", 0.10), x_offset=crop.get("x_offset", 0.0), master=master,
+                       mute=c.audio == "muted")
     return info
 
 
@@ -115,6 +119,24 @@ def look(job: Job, c: Clip, detail: list[tuple[float, float]] | None = None) -> 
     return []
 
 
+def _secs(v) -> float:
+    sec = 0.0
+    for part in str(v).split(":"):
+        sec = sec * 60 + float(part)
+    return sec
+
+
+def _hint_context(c: Clip) -> dict:
+    """What research knew about the moment, with the payoff in clip (source.mp4) seconds."""
+    h = c.hint or {}
+    out = {k: h[k] for k in ("kind", "hook", "why") if h.get(k)}
+    if h.get("payoff"):
+        out["payoff_hint_t"] = round(_secs(h["payoff"]) - _secs(c.start), 2)
+        out["payoff_hint_note"] = "research's estimate in source.mp4 seconds: start the frame search here"
+    out["audio_source"] = c.audio
+    return out
+
+
 def draft(job: Job, c: Clip) -> None:
     """Template the AI/editor turns into plan.json (see .claude/skills/hype-edit)."""
     if job.plan(c).exists() or job.draft(c).exists():
@@ -132,6 +154,7 @@ def draft(job: Job, c: Clip) -> None:
         "_context": {
             "label": c.label, "title": c.title, "caption": c.caption,
             "stream_range": f"{c.start}-{c.end}",
+            **_hint_context(c),
             "look": ["look/overview.jpg", "look/audio_envelope.txt"],
             "detail": f"python3 -m pipeline look {job.path.relative_to(ROOT)} --clip {c.id} --detail A,B",
             "save_as": "plan.json",

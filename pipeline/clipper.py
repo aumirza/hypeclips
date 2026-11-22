@@ -42,6 +42,10 @@ import time
 from typing import Any
 
 VERSION = "2.0.0"
+# what is kept of the stream's own sound
+SOURCES = ("original", "no_voice", "voice_only", "muted")
+LEGACY_MODES = {"gunshots": "no_voice", "bgm": "muted", "original": "original"}  # old audio.mode values
+
 TIME_RE = re.compile(r"^(?:(\d+):)?([0-5]?\d):([0-5]?\d(?:\.\d+)?)$")
 
 
@@ -84,9 +88,20 @@ def validate_config(cfg: dict[str, Any]) -> None:
         raise ValueError(f"Invalid crop x_offset={xo}")
 
     audio = cfg.setdefault("audio", {})
-    mode = audio.setdefault("mode", "gunshots")
-    if mode not in ("gunshots", "bgm", "original"):
-        raise ValueError(f"Invalid audio.mode '{mode}' (expected gunshots, bgm, or original)")
+    if "source" not in audio:
+        mode = audio.get("mode", "gunshots")
+        if mode not in LEGACY_MODES:
+            raise ValueError(f"Invalid audio.mode '{mode}' (use audio.source: {', '.join(SOURCES)})")
+        audio["source"] = LEGACY_MODES[mode]
+    if audio["source"] not in SOURCES:
+        raise ValueError(f"Invalid audio.source '{audio['source']}' (expected {', '.join(SOURCES)})")
+    on_fail = audio.setdefault("on_fail", "ffmpeg_cut")
+    if on_fail not in ("ffmpeg_cut", "original", "error"):
+        raise ValueError(f"Invalid audio.on_fail '{on_fail}' (expected ffmpeg_cut, original or error)")
+    for c in clips:
+        src = (c.get("audio") or {}).get("source")
+        if src and src not in SOURCES:
+            raise ValueError(f"Clip id={c['id']}: invalid audio.source '{src}' (expected {', '.join(SOURCES)})")
     eng = audio.setdefault("isolation_engine", "auto")
     if eng not in ("auto", "audio_separator", "demucs", "ffmpeg_vocal_cut"):
         raise ValueError(f"Invalid audio.isolation_engine '{eng}'")
@@ -252,7 +267,9 @@ def vocal_suppression_filter(strength: str) -> str:
     )
 
 
-def run_ai_vocal_strip(raw_path: pathlib.Path, audio_cfg: dict[str, Any], work_dir: pathlib.Path) -> tuple[pathlib.Path | None, str]:
+def run_ai_vocal_strip(raw_path: pathlib.Path, audio_cfg: dict[str, Any], work_dir: pathlib.Path,
+                       stem: str = "no_vocals") -> tuple[pathlib.Path | None, str]:
+    """AI voice separation. stem="no_vocals" keeps everything but the voice, "vocals" only the voice."""
     engine = audio_cfg.get("isolation_engine", "auto")
     strict = bool(audio_cfg.get("strict_isolation", False))
     wav_in = work_dir / f"{raw_path.stem}_orig.wav"
@@ -268,8 +285,9 @@ def run_ai_vocal_strip(raw_path: pathlib.Path, audio_cfg: dict[str, Any], work_d
         sep_dir = work_dir / f"sep_{raw_path.stem}"
         sep_dir.mkdir(exist_ok=True)
         model = audio_cfg.get("audio_separator_model", "UVR-MDX-NET-Inst_HQ_3.onnx")
-        run([sep_bin, str(ensure_wav()), "--model_filename", model, "--output_dir", str(sep_dir), "--single_stem", "Instrumental"])
-        matches = list(sep_dir.glob("*Instrumental*.wav")) + list(sep_dir.glob("*Instrumental*.flac"))
+        want = "Instrumental" if stem == "no_vocals" else "Vocals"
+        run([sep_bin, str(ensure_wav()), "--model_filename", model, "--output_dir", str(sep_dir), "--single_stem", want])
+        matches = list(sep_dir.glob(f"*{want}*.wav")) + list(sep_dir.glob(f"*{want}*.flac"))
         if matches:
             return matches[0], "audio_separator"
 
@@ -277,8 +295,10 @@ def run_ai_vocal_strip(raw_path: pathlib.Path, audio_cfg: dict[str, Any], work_d
     demucs_bin = find_binary("demucs")
     if engine in ("auto", "demucs") and demucs_bin:
         demucs_out = work_dir / "demucs_out"
-        run([demucs_bin, "--two-stems=vocals", "-o", str(demucs_out), str(ensure_wav())])
-        matches = list(demucs_out.rglob(f"{wav_in.stem}/no_vocals.*")) or list(demucs_out.rglob("no_vocals.*"))
+        matches = list(demucs_out.rglob(f"{wav_in.stem}/{stem}.*"))
+        if not matches:  # one demucs pass writes both stems; reuse it
+            run([demucs_bin, "--two-stems=vocals", "-o", str(demucs_out), str(ensure_wav())])
+            matches = list(demucs_out.rglob(f"{wav_in.stem}/{stem}.*"))
         if matches:
             return matches[0], "demucs"
 
@@ -400,7 +420,8 @@ def build_audio_chain(
     work_dir: pathlib.Path,
 ) -> tuple[list[str], str, str]:
     audio_cfg = cfg["audio"]
-    audio_mode = audio_cfg["mode"]
+    source = audio_cfg["source"]
+    on_fail = audio_cfg.get("on_fail", "ffmpeg_cut")
     bgm_path = audio_cfg.get("bgm_path") or audio_cfg.get("bgm") or ""
     bgm_vol = float(audio_cfg.get("bgm_volume", audio_cfg.get("bgm_vol", 0.28)))
     sfx_vol = float(audio_cfg.get("sfx_volume", 0.85))
@@ -411,21 +432,29 @@ def build_audio_chain(
     next_idx = 1
     mix_labels: list[str] = []
     parts: list[str] = []
-    used_engine = audio_mode
+    used_engine = source
 
-    if has_audio and audio_mode == "gunshots":
-        ai_wav, used_engine = run_ai_vocal_strip(raw_path, audio_cfg, work_dir)
+    if has_audio and source in ("no_voice", "voice_only"):
+        stem = "no_vocals" if source == "no_voice" else "vocals"
+        ai_wav, engine = run_ai_vocal_strip(raw_path, audio_cfg, work_dir, stem)
+        used_engine = engine if source == "no_voice" else f"voice_only/{engine}"
         if ai_wav:
             extra_inputs += ["-i", str(ai_wav)]
-            game_in = f"[{next_idx}:a]"
+            src_in = f"[{next_idx}:a]"
             next_idx += 1
-            eq_chain = f",{vocal_suppression_filter('moderate')}" if post_eq else ""
+            eq_chain = f",{vocal_suppression_filter('moderate')}" if (post_eq and source == "no_voice") else ""
+        elif on_fail == "error":
+            raise RuntimeError(f"audio.source={source} needs demucs or audio-separator, and neither worked (audio.on_fail=error)")
+        elif on_fail == "original":
+            print(f"[warn] voice separation unavailable: keeping the original sound (audio.on_fail=original)")
+            src_in, eq_chain, used_engine = "[0:a]", "", f"{source}->original"
         else:
-            game_in = "[0:a]"
-            eq_chain = f",{vocal_suppression_filter(strength)}"
-        parts.append(f"{game_in}aresample=48000,aformat=channel_layouts=stereo{eq_chain},loudnorm=I=-14:TP=-1.5:LRA=11[g]")
+            src_in = "[0:a]"
+            eq_chain = (f",{vocal_suppression_filter(strength)}" if source == "no_voice"
+                        else ",pan=stereo|c0=0.5*c0+0.5*c1|c1=0.5*c0+0.5*c1,highpass=f=120,lowpass=f=7000")
+        parts.append(f"{src_in}aresample=48000,aformat=channel_layouts=stereo{eq_chain},loudnorm=I=-14:TP=-1.5:LRA=11[g]")
         mix_labels.append("[g]")
-    elif has_audio and audio_mode == "original":
+    elif has_audio and source == "original":
         parts.append("[0:a]loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[g]")
         mix_labels.append("[g]")
 
@@ -505,7 +534,7 @@ def render_clip(
     if out_dur <= 0.5:
         raise RuntimeError("Rendered output failed integrity check.")
 
-    hashtags = cfg.get("default_hashtags", "#GTA6 #GamingShorts")
+    hashtags = clip.get("hashtags") or cfg.get("default_hashtags", "#Shorts")
     meta = f"TITLE:\n{clip.get('title', clip['label'])}\n\nCAPTION:\n{clip.get('caption', '')}\n\nHASHTAGS:\n{hashtags}\n"
     out_path.with_suffix(".txt").write_text(meta, encoding="utf-8")
 
@@ -549,7 +578,7 @@ def run_self_test(cfg: dict[str, Any] | None = None) -> None:
         }
 
     test_cfg.setdefault("audio", {})
-    test_cfg["audio"]["mode"] = "gunshots"
+    test_cfg["audio"]["source"] = "no_voice"
     test_cfg["audio"]["isolation_engine"] = "ffmpeg_vocal_cut"
     test_cfg["audio"]["bgm_path"] = ""
     validate_config(test_cfg)
@@ -595,7 +624,7 @@ def main() -> None:
     parser.add_argument("--check", action="store_true", help="Print installed tools and audio-isolation engines")
     parser.add_argument("--config", default=None, help="Path to JSON job configuration")
     parser.add_argument("--clips", type=int, nargs="+", default=None, help="Render only specific clip IDs")
-    parser.add_argument("--audio-mode", choices=["gunshots", "bgm", "original"], default=None, help="Override audio mode")
+    parser.add_argument("--audio-source", choices=list(SOURCES), default=None, help="Override audio.source for every clip")
     parser.add_argument(
         "--isolation-engine", "--engine",
         choices=["auto", "audio_separator", "demucs", "ffmpeg_vocal_cut"],
@@ -640,8 +669,8 @@ def main() -> None:
         sys.exit("Error: --config <job.json> is required (or pass --check or --self-test).")
 
     cfg = json.loads(pathlib.Path(args.config).read_text(encoding="utf-8"))
-    if args.audio_mode:
-        cfg.setdefault("audio", {})["mode"] = args.audio_mode
+    if args.audio_source:
+        cfg.setdefault("audio", {})["source"] = args.audio_source
     if args.isolation_engine:
         cfg.setdefault("audio", {})["isolation_engine"] = args.isolation_engine
     if args.vocal_cut_strength:
@@ -698,17 +727,29 @@ def main() -> None:
         except Exception:
             pass
 
-    req_engine = cfg["audio"].get("isolation_engine", "auto")
-    if req_engine == "auto":
-        req_engine = "demucs" if env.get("demucs") else ("audio_separator" if env.get("audio_separator") else "ffmpeg_vocal_cut")
-    if cfg["audio"].get("mode") != "gunshots":
-        req_engine = cfg["audio"].get("mode")
+    eng = cfg["audio"].get("isolation_engine", "auto")
+    if eng == "auto":
+        eng = "demucs" if env.get("demucs") else ("audio_separator" if env.get("audio_separator") else "ffmpeg_vocal_cut")
+
+    def clip_cfg(clip: dict[str, Any]) -> dict[str, Any]:
+        """The job config with this clip's own audio settings layered on top."""
+        if not clip.get("audio"):
+            return cfg
+        c = dict(cfg)
+        c["audio"] = {**cfg["audio"], **clip["audio"]}
+        return c
+
+    def engine_tag(c: dict[str, Any]) -> str:
+        src = c["audio"]["source"]
+        return eng if src == "no_voice" else (f"voice_only/{eng}" if src == "voice_only" else src)
 
     results: list[dict[str, Any]] = []
     for idx, clip in enumerate(clips, start=1):
         out_path = out_dir / f"clip_{clip['id']:02d}_{clip['slug']}.mp4"
         print(f"\n[{idx}/{len(clips)}] Clip {clip['id']:02d}: {clip['label']} ({clip['start']} - {clip['end']})")
 
+        ccfg = clip_cfg(clip)
+        req_engine = engine_tag(ccfg)
         existing_dur, _ = probe_media(out_path)
         prev_entry = prev_report_map.get(clip["id"])
         prev_engine = prev_entry.get("audio_engine") if prev_entry else None
@@ -724,7 +765,7 @@ def main() -> None:
 
         try:
             raw_path = download_segment(cfg["video_url"], clip, work_dir, cookies, args.retries, int(cfg["download"]["max_height"]))
-            res = render_clip(clip, raw_path, out_path, verify_dir, cfg, font_arg, sfx_path, work_dir)
+            res = render_clip(clip, raw_path, out_path, verify_dir, ccfg, font_arg, sfx_path, work_dir)
             results.append(res)
             print(f"  -> OK: {res['file']} ({res['duration_s']}s, {res['size_mb']} MB, audio={res['audio_engine']})")
         except Exception as exc:

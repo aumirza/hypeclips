@@ -10,7 +10,7 @@
     "x_offset": 0
   },
   "audio": {
-    "mode": "gunshots",
+    "source": "no_voice",
     "isolation_engine": "demucs",
     "audio_separator_model": "UVR-MDX-NET-Inst_HQ_3.onnx",
     "vocal_cut_strength": "aggressive",

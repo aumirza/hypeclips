@@ -1,6 +1,7 @@
 """Clips pipeline: one job config in, hype-edited shorts out.
 
   python3 -m pipeline doctor                         tools and versions
+  python3 -m pipeline research jobs/<job>.json       video URL -> clips in the job (resumable, AI gates)
   python3 -m pipeline run    jobs/<job>.json         everything up to review (resumable)
   python3 -m pipeline status jobs/<job>.json         where every clip stands, and what is next
   python3 -m pipeline look   jobs/<job>.json --clip N --detail A,B [--detail C,D]
@@ -71,8 +72,20 @@ def print_status(job: Job, clips):
         print("  - " + n)
 
 
+def cmd_research(a):
+    from .research import run as research_run
+
+    research_run.run(Job(a.job), rescan=a.rescan)
+
+
+def _need_clips(job: Job):
+    if not job.has_clips:
+        raise SystemExit(f"{job.path.name} has no clips yet: `python3 -m pipeline research {_rel(job.path)}` finds them")
+
+
 def cmd_run(a):
     job = Job(a.job)
+    _need_clips(job)
     clips = job.select(a.clips)
     print(f"job {job.name}: {len(clips)} clips -> {_rel(job.ws)}")
 
@@ -112,11 +125,13 @@ def cmd_run(a):
 
 def cmd_status(a):
     job = Job(a.job)
+    _need_clips(job)
     print_status(job, job.select(a.clips))
 
 
 def cmd_render(a):
     job = Job(a.job)
+    _need_clips(job)
     clips = [c for c in job.select(a.clips) if c.edit]
     for c in clips:
         if not stages.build_done(job, c):
@@ -175,6 +190,11 @@ def main(argv=None):
 
     s = sub.add_parser("doctor", help="check tools")
     s.set_defaults(fn=cmd_doctor)
+
+    s = sub.add_parser("research", help="video URL -> clips in the job; safe to repeat")
+    s.add_argument("job")
+    s.add_argument("--rescan", action="store_true", help="recompute the reading windows (orphans existing picks)")
+    s.set_defaults(fn=cmd_research)
 
     s = sub.add_parser("run", help="everything up to review; safe to repeat")
     s.add_argument("job")

@@ -1,9 +1,9 @@
 # hypeclips
 
-Stream timestamps in, one hype-edited vertical short per clip out; combining clips (rankings, compilations) belongs to a separate project. The single entry point is `python3 -m pipeline` (run from this folder); `/clip-pipeline` is the workflow, `/hype-edit` is the per-clip plan and the style.
+Stream timestamps in, one hype-edited vertical short per clip out; combining clips (rankings, compilations) belongs to a separate project. The single entry point is `python3 -m pipeline` (run from this folder): `research` (URL to clips), `run`, `render`. `/clip-pipeline` is the workflow, `/hype-edit` is the per-clip plan and the style.
 
 - `jobs/` one JSON per source video (format: `jobs/README.md`)
-- `pipeline/` the entry point: stages, job paths, and `clipper.py` (download, crop, demucs game audio, plain short)
+- `pipeline/` the entry point: stages, job paths, `clipper.py` (download, crop, voice separation, plain short), `research/` (signals, windows, picks, verify, selection)
 - `hypeedit/` the edit library: plan → HyperFrames project (vocabulary in `.claude/skills/hype-edit/references/`)
 - `assets/music/` local tracks, git-ignored
 - `workspace/<job>/` every generated file, git-ignored

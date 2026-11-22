@@ -4,7 +4,7 @@ Turn timestamps from a long gameplay stream into vertical shorts, then into **hy
 
 This project only makes clips: one finished short per timestamp range. Combining clips (rankings, compilations) is a separate project that consumes `workspace/<job>/final/`.
 
-Built to be driven by an AI agent (Claude Code): you write the job, the agent runs the pipeline, writes an edit plan per clip from the frames, reviews, and renders.
+Built to be driven by an AI agent (Claude Code): give it a stream URL and a one-line brief, and it researches the stream (captions, comment timestamps, chat, speaker loudness), picks and visually verifies the moments, writes an edit plan per clip from the frames, reviews, and renders. Any game or content and any caption language; nothing is GTA-specific.
 
 ## Setup
 
@@ -16,6 +16,7 @@ Built to be driven by an AI agent (Claude Code): you write the job, the agent ru
 ## Use
 
 ```bash
+python3 -m pipeline research jobs/carry_gta6_research.json  # URL -> clips (resumable; AI gates: picks, selection)
 python3 -m pipeline run    jobs/carry_gta6.json   # shorts, edit sources, look sheets, plan drafts, builds
 python3 -m pipeline status jobs/carry_gta6.json   # stage table + what is next
 python3 -m pipeline look   jobs/carry_gta6.json --clip 3 --detail 5.2,6.1
@@ -28,6 +29,7 @@ python3 -m pipeline render jobs/carry_gta6.json   # final renders -> workspace/c
 
 | stage | what | output in `workspace/<job>/` |
 | --- | --- | --- |
+| research | captions (romanized if needed), comment/chat/heatmap/loudness signals, hot windows, AI picks, 360p verify sheets, AI selection; writes `clips` into the job | `research/` |
 | short | download at `download.max_height` (1440p), 9:16 crop, demucs strips the streamer's voice, plain short | `shorts/` |
 | proxy | 540×960 edit source | `edits/<clip>/source_proxy.mp4` |
 | look | timestamped contact sheet + audio envelope | `edits/<clip>/look/` |

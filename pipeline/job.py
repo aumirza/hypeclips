@@ -39,10 +39,19 @@ class Clip:
     start: str
     end: str
     edit: bool
+    audio: str = "no_voice"  # original | no_voice | voice_only | muted
+    hint: dict | None = None  # from research: kind, payoff (stream time), hook, why
 
     @property
     def key(self) -> str:
         return f"clip_{self.id:02d}_{self.slug}"
+
+
+def audio_source(cfg: dict, clip: dict) -> str:
+    """Per-clip audio.source, else the job's, else what the legacy audio.mode meant."""
+    a = cfg.get("audio") or {}
+    return ((clip.get("audio") or {}).get("source") or a.get("source")
+            or clipper.LEGACY_MODES.get(a.get("mode", "gunshots"), "no_voice"))
 
 
 class Job:
@@ -50,10 +59,15 @@ class Job:
         self.path = pathlib.Path(path).resolve()
         self.cfg = json.loads(self.path.read_text(encoding="utf-8"))
         self.name = self.cfg.get("name") or self.path.stem
-        # the clipper validates (and fills defaults into) its own sections
-        checked = copy.deepcopy(self.cfg)
-        clipper.validate_config(checked)
-        self.cfg = checked
+        # the clipper validates (and fills defaults into) its own sections; a job that
+        # only has a video_url so far (before `research` fills its clips) skips that
+        self.has_clips = bool(self.cfg.get("clips"))
+        if self.has_clips:
+            checked = copy.deepcopy(self.cfg)
+            clipper.validate_config(checked)
+            self.cfg = checked
+        elif not str(self.cfg.get("video_url", "")).startswith(("http://", "https://")):
+            raise SystemExit(f"{self.path.name}: needs a video_url")
         e = self.cfg.get("edit") or {}
         self.edit = {"enabled": e.get("enabled", True), "style": e.get("style", "phonk-hype"),
                      "music": e.get("music"), "accent": e.get("accent", "#ff3030")}
@@ -64,8 +78,9 @@ class Job:
                 raise SystemExit(f"{self.path.name}: edit.music not found: {self.edit['music']}")
         self.clips = [
             Clip(c["id"], c["slug"], c["label"], c.get("title", c["label"]), c.get("caption", ""),
-                 c["start"], c["end"], bool(c.get("edit", True)) and self.edit["enabled"])
-            for c in self.cfg["clips"]
+                 c["start"], c["end"], bool(c.get("edit", True)) and self.edit["enabled"],
+                 audio_source(self.cfg, c), c.get("hint") or {})
+            for c in self.cfg.get("clips") or []
         ]
         self.ws = WORKSPACE / self.name
         self.shorts = self.ws / "shorts"
@@ -90,9 +105,16 @@ class Job:
         stamp = self.raw(c).with_name(self.raw(c).name + ".maxh")
         return self.raw(c).exists() and stamp.exists() and stamp.read_text().strip() == str(self.cfg["download"]["max_height"])
 
-    def game_audio(self, c: Clip) -> pathlib.Path | None:
-        p = self.tmp / "demucs_out" / "htdemucs" / f"raw_{c.id:02d}_orig" / "no_vocals.wav"
-        return p if p.exists() and self.cfg["audio"].get("mode") == "gunshots" else None
+    def edit_audio(self, c: Clip) -> tuple[pathlib.Path | None, str | None]:
+        """(replacement audio for the edit source, warning). None audio = keep the raw's own sound."""
+        if c.audio in ("no_voice", "voice_only"):
+            stem = "no_vocals" if c.audio == "no_voice" else "vocals"
+            hits = sorted(self.tmp.glob(f"demucs_out/*/raw_{c.id:02d}_orig/{stem}.*")) + \
+                sorted(self.tmp.glob(f"sep_raw_{c.id:02d}/*{'Instrumental' if stem == 'no_vocals' else 'Vocals'}*"))
+            if hits:
+                return hits[0], None
+            return None, f"{c.key}: audio.source={c.audio} but no separated stem was found; the edit keeps the ORIGINAL sound"
+        return None, None
 
     def short(self, c: Clip) -> pathlib.Path:
         return self.shorts / f"{c.key}.mp4"

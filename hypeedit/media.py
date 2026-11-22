@@ -48,7 +48,8 @@ def proxy_path(master) -> pathlib.Path:
     return m.with_name(f"{m.stem}_proxy{m.suffix}")
 
 
-def prep(src, out, audio=None, trim_top=0.04, trim_bottom=0.10, x_offset=0.0, sharpen=0.6, fps_cap=60, master=True):
+def prep(src, out, audio=None, trim_top=0.04, trim_bottom=0.10, x_offset=0.0, sharpen=0.6, fps_cap=60, master=True,
+         mute=False):
     """Raw footage -> a fast 540x960 proxy, then the high-quality 1080x1920 master.
 
     Same crop as pipeline/clipper.py, at the input's full resolution and fps, with
@@ -67,7 +68,7 @@ def prep(src, out, audio=None, trim_top=0.04, trim_bottom=0.10, x_offset=0.0, sh
         x = max(0, min(w - crop_w, (w - crop_w) / 2 + w * x_offset))
         crop = [f"crop={int(crop_w) // 2 * 2}:{int(usable_h) // 2 * 2}:{int(x)}:{int(h * trim_top)}"]
     fps = min(fps_cap, round(info.get("fps", 30)))
-    has_audio = bool(audio or info["has_audio"])
+    has_audio = bool(audio or info["has_audio"]) and not mute
     out = pathlib.Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
 
