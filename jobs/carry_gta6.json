@@ -1,0 +1,134 @@
+{
+  "name": "carry_gta6",
+  "video_url": "https://www.youtube.com/watch?v=irNhWMG560k",
+  "default_hashtags": "#GTA6 #GTAVI #GTA6Gameplay #GTA6Clips #GamingShorts",
+  "cookies_browser": "",
+  "cookies_file": "",
+  "crop": {
+    "trim_top": 0.04,
+    "trim_bottom": 0.1,
+    "x_offset": 0
+  },
+  "audio": {
+    "mode": "gunshots",
+    "isolation_engine": "demucs",
+    "audio_separator_model": "UVR-MDX-NET-Inst_HQ_3.onnx",
+    "vocal_cut_strength": "aggressive",
+    "post_vocal_suppression": false,
+    "strict_isolation": false,
+    "bgm_path": "",
+    "bgm_volume": 0.28,
+    "sfx_enabled": true,
+    "sfx_volume": 0.6,
+    "tts_enabled": false,
+    "tts_voice": "en-US-ChristopherNeural",
+    "tts_rate": "+8%",
+    "tts_volume": 1.25,
+    "tts_delay_sec": 0.15
+  },
+  "fx": {
+    "enabled": true,
+    "show_title": true
+  },
+  "clips": [
+    {
+      "id": 1,
+      "slug": "cover_fire_out_of_ammo",
+      "label": "Out of Ammo Mid-Fight",
+      "start": "00:42:58",
+      "end": "00:43:15",
+      "title": "Running Out of Ammo Mid-Shootout in GTA 6!",
+      "caption": "Worst possible time to hear that empty click. Would you survive this?",
+      "tts_text": "Running out of ammo mid firefight!"
+    },
+    {
+      "id": 2,
+      "slug": "under_fire_flanked",
+      "label": "Flanked Under Fire",
+      "start": "00:43:40",
+      "end": "00:43:56",
+      "title": "Getting Flanked From Every Angle in GTA 6!",
+      "caption": "GTA 6 enemy AI actually flanks now. Rate this gunfight 1-10!",
+      "tts_text": "Getting flanked from every angle!"
+    },
+    {
+      "id": 3,
+      "slug": "clean_headshot",
+      "label": "Clean Headshot",
+      "start": "00:44:08",
+      "end": "00:44:22",
+      "title": "Insanely Clean Headshot in GTA 6!",
+      "caption": "That headshot physics hit different in GTA 6.",
+      "tts_text": "Insanely clean headshot!"
+    },
+    {
+      "id": 4,
+      "slug": "point_blank_shootout",
+      "label": "Point-Blank Firefight",
+      "start": "00:46:05",
+      "end": "00:46:28",
+      "title": "Point-Blank Shootout Chaos in GTA 6!",
+      "caption": "Close-quarters gunplay in GTA 6 looks wild.",
+      "tts_text": "Point blank shootout chaos!"
+    },
+    {
+      "id": 5,
+      "slug": "mid_fight_pistol_switch",
+      "label": "Mid-Fight Pistol Swap",
+      "start": "00:47:32",
+      "end": "00:47:46",
+      "title": "Clutch Mid-Fight Pistol Switch in GTA 6!",
+      "caption": "Remember: switching to your pistol is always faster than reloading.",
+      "tts_text": "Clutch mid fight pistol swap!"
+    },
+    {
+      "id": 6,
+      "slug": "instant_headshot_death",
+      "label": "One-Tapped by Enemy",
+      "start": "03:04:56",
+      "end": "03:05:18",
+      "title": "GTA 6 NPCs Have Insane Aim Now!",
+      "caption": "Instant headshot out of nowhere. GTA 6 NPCs don't miss.",
+      "tts_text": "Instant headshot out of nowhere!"
+    },
+    {
+      "id": 7,
+      "slug": "chaotic_aim_fight",
+      "label": "Chaotic Recoil Fight",
+      "start": "04:06:38",
+      "end": "04:07:00",
+      "title": "GTA 6 Gun Recoil Is No Joke!",
+      "caption": "Shooting in GTA 6 feels way heavier than GTA 5.",
+      "tts_text": "GTA 6 gun recoil is no joke!"
+    },
+    {
+      "id": 8,
+      "slug": "street_npc_ambush",
+      "label": "Street NPC Ambush",
+      "start": "06:06:16",
+      "end": "06:06:30",
+      "title": "Random GTA 6 Street NPCs Pulled Guns Out of Nowhere!",
+      "caption": "You can't even chill on the street in Vice City.",
+      "tts_text": "Random street NPC ambush!"
+    },
+    {
+      "id": 9,
+      "slug": "long_range_snipe",
+      "label": "Long-Range Snipe",
+      "start": "09:43:25",
+      "end": "09:43:44",
+      "title": "Long-Range Kill Shot in GTA 6!",
+      "caption": "Clean long-distance takedown. How do GTA 6 weapon mechanics look to you?",
+      "tts_text": "Insane long range kill shot!"
+    }
+  ],
+  "download": {
+    "max_height": 1440
+  },
+  "edit": {
+    "enabled": true,
+    "style": "phonk-hype",
+    "music": "assets/music/phonk.mp3",
+    "accent": "#ff3030"
+  }
+}

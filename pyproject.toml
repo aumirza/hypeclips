@@ -1,0 +1,14 @@
+[project]
+name = "hypeclips"
+version = "0.1.0"
+description = "Stream timestamps to hype-edited vertical shorts (yt-dlp, demucs, ffmpeg, HyperFrames)"
+readme = "README.md"
+requires-python = ">=3.10"
+# pipeline/ and hypeedit/ are stdlib-only; these are the external tools they call
+dependencies = [
+    "yt-dlp>=2024.10.0",
+    "demucs>=4.0.0",
+]
+
+[tool.uv]
+package = false

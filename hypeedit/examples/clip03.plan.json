@@ -1,0 +1,72 @@
+{
+  "name": "clip_03_clean_headshot",
+  "source": "source.mp4",
+  "music": {
+    "file": "../../../../assets/music/phonk.mp3"
+  },
+  "style": "phonk-hype",
+  "text": {
+    "hook": [
+      "INSANELY CLEAN",
+      "HEADSHOT"
+    ],
+    "tease": "WAIT FOR IT",
+    "stamp": "HEADSHOT",
+    "outro": [
+      "CLEAN",
+      "OR LUCKY?"
+    ],
+    "accent": "#ff3030"
+  },
+  "beats": [
+    {
+      "kind": "whip",
+      "t": 1.6,
+      "note": "turns from cover to peek"
+    },
+    {
+      "kind": "build",
+      "t": 2.3,
+      "end": 4.6,
+      "note": "aiming at the house, target hidden"
+    },
+    {
+      "kind": "payoff",
+      "t": 5.65,
+      "focus": [
+        540,
+        1035
+      ],
+      "lock": true,
+      "note": "enemy behind the water tank drops, hit marker"
+    },
+    {
+      "kind": "whip",
+      "t": 6.0,
+      "note": "snaps back into cover"
+    },
+    {
+      "kind": "hit",
+      "t": 8.7,
+      "note": "returns fire over the truck bed"
+    },
+    {
+      "kind": "hit",
+      "t": 8.8,
+      "hurt": true,
+      "note": "takes a hit, in-game chromatic damage"
+    },
+    {
+      "kind": "whip",
+      "t": 9.1,
+      "note": "ducks back down"
+    },
+    {
+      "kind": "lull",
+      "t": 9.3,
+      "end": 11.6,
+      "note": "crouched behind the truck"
+    }
+  ],
+  "out_dir": "project"
+}
